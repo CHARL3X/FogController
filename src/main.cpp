@@ -1108,6 +1108,8 @@ void setup() {
 
   if (connected) {
     apMode = false;
+    WiFi.setSleep(false);         // disable WiFi power saving
+    WiFi.setAutoReconnect(true);  // auto-reconnect on drop
     Serial.print("[FogControl] Connected! IP: ");
     Serial.println(WiFi.localIP());
     MDNS.begin("fog");
@@ -1198,6 +1200,30 @@ void loop() {
     if (now - lastLedToggle > 150) {
       digitalWrite(LED_PIN, !digitalRead(LED_PIN));
       lastLedToggle = now;
+    }
+  }
+
+  // ── WiFi reconnection watchdog (STA mode only) ────────────────────────
+  if (!apMode && !connectInProgress && !rebootPending) {
+    static bool wasDisconnected = false;
+    if (WiFi.status() != WL_CONNECTED) {
+      if (!wasDisconnected) {
+        wasDisconnected = true;
+        Serial.println("[FogControl] WiFi lost — waiting for auto-reconnect...");
+      }
+      // Blink LED while disconnected
+      static unsigned long lastReconLed = 0;
+      if (now - lastReconLed > 500) {
+        digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+        lastReconLed = now;
+      }
+    } else if (wasDisconnected) {
+      // Just reconnected
+      wasDisconnected = false;
+      ledOn();
+      MDNS.begin("fog"); // re-register mDNS after reconnect
+      Serial.print("[FogControl] Reconnected! IP: ");
+      Serial.println(WiFi.localIP());
     }
   }
 
