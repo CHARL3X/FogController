@@ -466,8 +466,8 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
   if (type == WS_EVT_CONNECT) {
     lastClientActivityMs = millis();
     client->text(buildStateJson());
-    // If in AP mode, also send saved networks list to the new client
-    if (apMode) {
+    // Send saved networks list to new client (needed in both modes)
+    {
       String savedJson = "{\"t\":\"saved\",\"nets\":[";
       for (int i = 0; i < savedCount; i++) {
         if (i > 0) savedJson += ",";
@@ -803,6 +803,12 @@ input[type=range]:active::-webkit-slider-thumb{background:var(--amber)}
   </div>
 </div>
 
+<!-- Saved networks (STA mode) -->
+<div class="section" id="staSavedSection" style="display:none">
+  <div class="sec-head"><span class="sec-title">Saved Networks</span></div>
+  <div id="staSavedArea"></div>
+</div>
+
 <div class="cd-overlay" id="cdOverlay">
   <div class="cd-label">Cooldown</div>
   <div class="cd-time" id="cdTime">0.0</div>
@@ -818,7 +824,7 @@ var ws,state={},reconnTimer=null,selectedSSID="",savedNets=[];
 
 function connect(){
   ws=new WebSocket("ws://"+location.hostname+"/ws");
-  ws.onopen=function(){clearTimeout(reconnTimer);if(state.ap)send({cmd:"wsaved"})};
+  ws.onopen=function(){clearTimeout(reconnTimer)};
   ws.onclose=function(){reconnTimer=setTimeout(connect,2000)};
   ws.onmessage=function(e){
     var msg=JSON.parse(e.data);
@@ -937,14 +943,22 @@ function handleWifiStatus(msg){
 }
 
 function renderSavedNets(){
-  var area=document.getElementById("savedArea");
-  if(!savedNets||savedNets.length===0){area.innerHTML="";return}
-  var h='<div class="saved-title">Saved Networks</div>';
-  for(var i=0;i<savedNets.length;i++){
-    h+='<div class="saved-item"><span class="saved-ssid">'+escHtml(savedNets[i])+'</span>'+
-      '<button class="saved-del" onclick="forgetNet('+i+')">&times;</button></div>';
+  var items="";
+  if(savedNets&&savedNets.length>0){
+    for(var i=0;i<savedNets.length;i++){
+      items+='<div class="saved-item"><span class="saved-ssid">'+escHtml(savedNets[i])+'</span>'+
+        '<button class="saved-del" onclick="forgetNet('+i+')">&times;</button></div>';
+    }
   }
-  area.innerHTML=h;
+  // AP mode: show inside WiFi setup section
+  var area=document.getElementById("savedArea");
+  if(savedNets&&savedNets.length>0){
+    area.innerHTML='<div class="saved-title">Saved Networks</div>'+items;
+  }else{area.innerHTML=""}
+  // STA mode: show in standalone section
+  var staArea=document.getElementById("staSavedArea");
+  staArea.innerHTML=items;
+  document.getElementById("staSavedSection").style.display=(!state.ap&&savedNets&&savedNets.length>0)?"block":"none";
 }
 
 function forgetNet(idx){send({cmd:"wforget",val:idx})}
