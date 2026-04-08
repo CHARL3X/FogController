@@ -330,240 +330,341 @@ const char PAGE_HTML[] PROGMEM = R"rawliteral(
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Fog Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+:root{
+  --bg:#08080a;--surface:#111214;--surface2:#161819;
+  --border:#1e2023;--border2:#2a2d31;
+  --amber:#e8860c;--amber-dim:#7a4a0a;--amber-glow:rgba(232,134,12,.25);
+  --red:#cc2936;--red-dim:#661418;--red-glow:rgba(204,41,54,.3);
+  --green:#22a867;--green-dim:#0f5432;
+  --text:#d4d4d8;--text2:#71717a;--text3:#3f3f46;
+  --mono:'IBM Plex Mono','SF Mono','Fira Code',monospace;
+  --sans:'Chakra Petch','SF Pro Display',system-ui,sans-serif;
+  --radius:10px;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 body{
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  background:#111;color:#eee;
+  font-family:var(--sans);
+  background:var(--bg);color:var(--text);
   display:flex;flex-direction:column;align-items:center;
-  min-height:100vh;padding:20px 16px;
+  min-height:100vh;min-height:100dvh;padding:20px 16px 32px;
   -webkit-user-select:none;user-select:none;
-  transition:background .4s,color .4s;
+  transition:background .5s,color .5s;
+}
+/* Subtle noise texture */
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;
+  background:radial-gradient(ellipse at 50% 0%,#14151a 0%,var(--bg) 70%);
 }
 
-/* ── Night mode ─────────────────────────────────────────── */
-body.night{background:#0a0000;color:#c00}
-body.night h1{color:#600}
-body.night .badge{background:#200;color:#800;border-color:#300}
-body.night .badge .dot{background:#600}
+/* ═══ Night/Red mode ════════════════════════════════════════ */
+body.night{--bg:#080000;--surface:#120000;--surface2:#1a0000;
+  --border:#220000;--border2:#330000;
+  --amber:#cc2200;--amber-dim:#551100;--amber-glow:rgba(200,30,0,.3);
+  --text:#bb3333;--text2:#662222;--text3:#331111;
+  --green:#aa2200;--green-dim:#440000;--red:#aa0000;--red-dim:#440000}
+body.night::before{background:radial-gradient(ellipse at 50% 0%,#1a0500 0%,#080000 70%)}
+body.night .burst-ring{border-color:var(--red-dim)}
 body.night #burst{
-  background:radial-gradient(circle at 40% 35%,#300,#100);
-  color:#800;box-shadow:0 0 0 4px #100,0 0 20px rgba(80,0,0,.6);
+  background:radial-gradient(circle at 40% 35%,#2a0000,#100000);
+  color:#662222;box-shadow:0 8px 32px rgba(0,0,0,.8);
+  border-color:#330000;
 }
 body.night #burst.firing{
-  background:radial-gradient(circle at 40% 35%,#a00,#500);
-  color:#f44;box-shadow:0 0 0 4px #100,0 0 40px rgba(200,0,0,.5);
+  background:radial-gradient(circle at 40% 35%,#aa0000,#550000);
+  color:#ff4444;border-color:#cc0000;
+  box-shadow:0 0 60px rgba(200,0,0,.5),0 0 120px rgba(200,0,0,.2);
 }
-body.night .section{border-color:#200}
-body.night .sec-title{color:#600}
-body.night input[type=range]{background:#200}
-body.night input[type=range]::-webkit-slider-thumb{background:#a00}
-body.night .val{color:#c00}
-body.night .switch .sl{background:#200}
-body.night .switch input:checked+.sl{background:#800}
-body.night .lbl{color:#600}
-body.night .tap-btn{background:#300;color:#800;border-color:#400}
-body.night .tap-btn:active{background:#500}
-body.night .cd-overlay{background:rgba(10,0,0,.92);color:#a00}
-body.night .cd-overlay .cd-time{color:#f00}
-body.night .footer{color:#400}
-body.night .night-btn{color:#c00}
-body.night .pat-btn{background:#200;color:#800;border-color:#300}
-body.night .pat-btn.active{background:#600;color:#fff}
-body.night .pat-btn:disabled{opacity:.25}
-body.night .pat-btn.rec-btn.recording{background:#800;color:#f00}
-body.night .pat-btn.play-btn.playing{background:#600;color:#f44}
-body.night .preset-btn{background:#200;color:#600;border-color:#300}
-body.night .preset-btn.has-data{color:#800;border-color:#500}
-body.night .preset-btn.active{background:#600;color:#fff;border-color:#800}
-body.night .pat-info{color:#500}
+body.night .burst-ring.active{border-color:var(--red);box-shadow:0 0 30px var(--red-glow)}
+body.night input[type=range]::-webkit-slider-thumb{background:var(--red)}
+body.night .cd-overlay{background:rgba(8,0,0,.95)}
+body.night .cd-time{color:#ff2200}
+body.night .night-toggle{color:var(--red)}
 
-/* ── Header ─────────────────────────────────────────────── */
+/* ═══ Header ═══════════════════════════════════════════════ */
 .header{
-  width:100%;max-width:320px;
+  width:100%;max-width:360px;
   display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:24px;
+  margin-bottom:28px;
 }
-h1{font-size:1.2rem;color:#888;letter-spacing:.05em}
+h1{
+  font-size:1.05rem;font-weight:700;color:var(--text2);
+  letter-spacing:.14em;text-transform:uppercase;
+}
 .badge{
   display:flex;align-items:center;gap:6px;
-  background:#1a1a1a;border:1px solid #333;border-radius:12px;
-  padding:4px 10px;font-size:.7rem;color:#888;
+  background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:5px 12px;font-family:var(--mono);font-size:.6rem;
+  font-weight:500;color:var(--text3);letter-spacing:.03em;
 }
-.badge .dot{width:6px;height:6px;border-radius:50%;background:#4a4}
+.badge .dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 6px rgba(34,168,103,.5);
+}
 
-/* ── Burst button ───────────────────────────────────────── */
+/* ═══ Burst Button ═════════════════════════════════════════ */
+.burst-wrap{position:relative;margin-bottom:12px}
+.burst-ring{
+  width:188px;height:188px;border-radius:50%;
+  border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .3s;
+}
+.burst-ring.active{
+  border-color:var(--amber);
+  box-shadow:0 0 40px var(--amber-glow);
+}
+.burst-ring.rec-active{
+  border-color:var(--red);
+  box-shadow:0 0 30px var(--red-glow);
+  animation:ring-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ring-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
 #burst{
-  width:160px;height:160px;border-radius:50%;border:none;
-  background:radial-gradient(circle at 40% 35%,#444,#222);
-  color:#ccc;font-size:1.4rem;font-weight:700;letter-spacing:.06em;
-  cursor:pointer;transition:all .15s;
-  box-shadow:0 0 0 4px #222,0 0 20px rgba(0,0,0,.6);
+  width:164px;height:164px;border-radius:50%;
+  border:1px solid var(--border2);
+  background:radial-gradient(circle at 38% 32%,#2a2c30,#151618);
+  color:var(--text2);
+  font-family:var(--sans);font-size:1.3rem;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;
+  cursor:pointer;
+  transition:all .2s cubic-bezier(.22,1,.36,1);
+  box-shadow:0 8px 32px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.04);
+}
+#burst:active:not(:disabled){transform:scale(.93)}
+#burst:disabled{opacity:.2;cursor:not-allowed}
+#burst.firing{
+  background:radial-gradient(circle at 38% 32%,#d67200,#8a3a00);
+  color:#fff;border-color:var(--amber);
+  box-shadow:0 0 60px var(--amber-glow),0 0 120px rgba(232,134,12,.12);
+}
+
+/* ═══ Sections ═════════════════════════════════════════════ */
+.section{
+  width:100%;max-width:360px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:14px 16px;
   margin-bottom:8px;
 }
-#burst:active:not(:disabled){transform:scale(.95)}
-#burst:disabled{opacity:.25;cursor:not-allowed}
-#burst.firing{
-  background:radial-gradient(circle at 40% 35%,#f80,#a30);
-  color:#fff;box-shadow:0 0 0 4px #222,0 0 40px rgba(255,120,0,.5);
+.sec-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.sec-title{
+  font-size:.6rem;font-weight:700;color:var(--text3);
+  letter-spacing:.16em;text-transform:uppercase;
+}
+.row{display:flex;align-items:center;gap:10px}
+.row+.row{margin-top:8px}
+.lbl{font-family:var(--mono);font-size:.75rem;color:var(--text3);min-width:36px}
+.val{
+  font-family:var(--mono);font-size:.85rem;font-weight:600;
+  color:var(--amber);min-width:3.2em;text-align:right;
+  letter-spacing:.02em;
 }
 
-/* ── Sections ───────────────────────────────────────────── */
-.section{
-  width:100%;max-width:320px;
-  border-top:1px solid #222;
-  padding:16px 0 4px;
-}
-.sec-title{font-size:.7rem;color:#555;letter-spacing:.08em;margin-bottom:10px}
-.row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.lbl{font-size:.85rem;color:#777;min-width:40px}
-.val{font-size:.95rem;font-weight:600;color:#eee;min-width:3em;text-align:right}
+/* ═══ Range slider ═════════════════════════════════════════ */
 input[type=range]{
-  -webkit-appearance:none;flex:1;height:6px;border-radius:3px;
-  background:#333;outline:none;
+  -webkit-appearance:none;flex:1;height:4px;border-radius:2px;
+  background:var(--border);outline:none;
 }
 input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
-  background:#ddd;cursor:pointer;
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--text);cursor:pointer;
+  box-shadow:0 0 0 3px var(--bg),0 0 0 4px var(--border2);
+  transition:background .15s;
 }
+input[type=range]:active::-webkit-slider-thumb{background:var(--amber)}
 
-/* ── Toggle switch ──────────────────────────────────────── */
-.switch{position:relative;width:48px;height:26px;flex-shrink:0}
+/* ═══ Toggle switch ════════════════════════════════════════ */
+.switch{position:relative;width:44px;height:24px;flex-shrink:0}
 .switch input{opacity:0;width:0;height:0}
 .switch .sl{
-  position:absolute;inset:0;background:#333;border-radius:13px;
-  cursor:pointer;transition:all .25s;
+  position:absolute;inset:0;background:var(--border);border-radius:12px;
+  cursor:pointer;transition:all .3s;
 }
 .switch .sl::before{
-  content:"";position:absolute;left:3px;top:3px;
-  width:20px;height:20px;border-radius:50%;background:#888;
-  transition:all .25s;
+  content:"";position:absolute;left:2px;top:2px;
+  width:20px;height:20px;border-radius:50%;
+  background:var(--text3);transition:all .3s;
 }
-.switch input:checked+.sl{background:#c00}
-.switch input:checked+.sl::before{transform:translateX(22px);background:#fff}
+.switch input:checked+.sl{background:var(--amber-dim)}
+.switch input:checked+.sl::before{
+  transform:translateX(20px);
+  background:var(--amber);
+  box-shadow:0 0 8px var(--amber-glow);
+}
 
-/* ── Hold countdown bar ─────────────────────────────────── */
+/* ═══ Hold countdown bar ═══════════════════════════════════ */
 .hold-bar-wrap{
-  width:100%;height:4px;background:#222;border-radius:2px;
-  margin-top:4px;overflow:hidden;display:none;
+  width:100%;height:3px;background:var(--border);border-radius:2px;
+  margin-top:10px;overflow:hidden;display:none;
 }
 .hold-bar-wrap.active{display:block}
-.hold-bar{height:100%;background:#f80;border-radius:2px;transition:width .15s linear}
+.hold-bar{
+  height:100%;border-radius:2px;
+  background:linear-gradient(90deg,var(--amber),var(--red));
+  transition:width .15s linear;
+}
 
-/* ── Tap-tempo button ───────────────────────────────────── */
+/* ═══ Tap-tempo button ═════════════════════════════════════ */
 .tap-btn{
-  padding:6px 14px;border-radius:6px;border:1px solid #444;
-  background:#222;color:#aaa;font-size:.75rem;font-weight:600;
-  cursor:pointer;letter-spacing:.04em;flex-shrink:0;
+  padding:5px 16px;border-radius:6px;border:1px solid var(--border2);
+  background:var(--surface2);color:var(--text2);
+  font-family:var(--mono);font-size:.65rem;font-weight:600;
+  cursor:pointer;letter-spacing:.08em;text-transform:uppercase;
+  transition:all .15s;flex-shrink:0;
 }
-.tap-btn:active{background:#333}
+.tap-btn:active{background:var(--border);color:var(--text)}
 
-/* ── Pattern controls ───────────────────────────────────── */
+/* ═══ Pattern controls ═════════════════════════════════════ */
+.pat-row{display:flex;gap:6px;margin-bottom:10px}
 .pat-btn{
-  flex:1;padding:10px 0;border-radius:8px;border:1px solid #333;
-  background:#1a1a1a;color:#888;font-size:.8rem;font-weight:700;
-  cursor:pointer;text-align:center;letter-spacing:.04em;
-  transition:all .15s;
+  flex:1;padding:10px 0;border-radius:8px;border:1px solid var(--border2);
+  background:var(--surface2);color:var(--text3);
+  font-family:var(--sans);font-size:.7rem;font-weight:700;
+  cursor:pointer;text-align:center;letter-spacing:.06em;
+  text-transform:uppercase;transition:all .2s;
 }
-.pat-btn:active:not(:disabled){transform:scale(.96)}
-.pat-btn:disabled{opacity:.25;cursor:not-allowed}
-.pat-btn.rec-btn.recording{
-  background:#a00;color:#fff;border-color:#c00;
-  animation:pulse-rec 1s infinite;
-}
-@keyframes pulse-rec{
-  0%,100%{opacity:1}
-  50%{opacity:.6}
-}
-.pat-btn.play-btn.playing{
-  background:#2a6;color:#fff;border-color:#3b7;
-}
-.pat-btn.stop-btn:active:not(:disabled){
-  background:#555;color:#fff;
-}
+.pat-btn:active:not(:disabled){transform:scale(.95)}
+.pat-btn:disabled{opacity:.15;cursor:not-allowed}
 
-.preset-btn{
-  flex:1;padding:8px 0;border-radius:6px;border:1px solid #282828;
-  background:#151515;color:#444;font-size:.75rem;font-weight:700;
-  cursor:pointer;text-align:center;transition:all .15s;
+.pat-btn.rec-btn.recording{
+  background:var(--red);color:#fff;border-color:var(--red);
+  box-shadow:0 0 20px var(--red-glow);
+  animation:rec-flash 1s ease-in-out infinite;
 }
-.preset-btn:disabled{opacity:.25;cursor:not-allowed}
-.preset-btn.has-data{color:#888;border-color:#444}
-.preset-btn.active{background:#444;color:#fff;border-color:#666}
-.preset-btn:active:not(:disabled){transform:scale(.96)}
+@keyframes rec-flash{0%,100%{opacity:1}50%{opacity:.65}}
+
+.pat-btn.play-btn.playing{
+  background:var(--green);color:#fff;border-color:var(--green);
+  box-shadow:0 0 16px rgba(34,168,103,.3);
+}
+.pat-btn.stop-btn:active:not(:disabled){background:var(--border2);color:var(--text)}
+
+.preset-row{display:flex;gap:5px}
+.preset-row+.preset-row{margin-top:5px}
+.preset-lbl{
+  font-family:var(--mono);font-size:.55rem;font-weight:600;
+  color:var(--text3);letter-spacing:.1em;width:32px;
+  display:flex;align-items:center;flex-shrink:0;
+}
+.preset-btn{
+  flex:1;padding:7px 0;border-radius:6px;border:1px solid var(--border);
+  background:transparent;color:var(--text3);
+  font-family:var(--mono);font-size:.7rem;font-weight:600;
+  cursor:pointer;text-align:center;transition:all .15s;
+  letter-spacing:.04em;
+}
+.preset-btn:disabled{opacity:.15;cursor:not-allowed}
+.preset-btn.has-data{color:var(--text2);border-color:var(--border2)}
+.preset-btn.active{
+  background:var(--amber-dim);color:var(--amber);border-color:var(--amber-dim);
+}
+.preset-btn:active:not(:disabled){transform:scale(.95)}
 
 .pat-info{
-  font-size:.7rem;color:#555;text-align:center;margin-top:2px;
-  min-height:1em;
+  font-family:var(--mono);font-size:.65rem;font-weight:500;
+  color:var(--text3);text-align:center;margin-top:8px;
+  letter-spacing:.03em;min-height:1em;
 }
+.pat-info.recording{color:var(--red)}
 
-.save-row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
-.save-lbl{font-size:.65rem;color:#555;letter-spacing:.06em;flex-shrink:0}
-
-/* ── Cooldown overlay ───────────────────────────────────── */
+/* ═══ Cooldown overlay ═════════════════════════════════════ */
 .cd-overlay{
-  position:fixed;inset:0;
-  background:rgba(0,0,0,.92);
+  position:fixed;inset:0;z-index:100;
+  background:rgba(8,8,10,.95);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   display:none;flex-direction:column;
   align-items:center;justify-content:center;
-  z-index:100;
 }
 .cd-overlay.active{display:flex}
-.cd-overlay .cd-label{font-size:1rem;color:#888;letter-spacing:.1em;margin-bottom:8px}
-.cd-overlay .cd-time{font-size:3rem;font-weight:700;color:#f80}
+.cd-label{
+  font-size:.7rem;font-weight:700;color:var(--text3);
+  letter-spacing:.2em;text-transform:uppercase;margin-bottom:12px;
+}
+.cd-time{
+  font-family:var(--mono);font-size:4rem;font-weight:600;
+  color:var(--amber);letter-spacing:-.02em;
+}
 
-/* ── Footer ─────────────────────────────────────────────── */
+/* ═══ Footer ═══════════════════════════════════════════════ */
 .footer{
-  margin-top:auto;padding-top:20px;
+  margin-top:auto;padding-top:24px;
   display:flex;align-items:center;justify-content:space-between;
-  width:100%;max-width:320px;
-  font-size:.65rem;color:#333;
+  width:100%;max-width:360px;
 }
-.night-btn{
-  background:none;border:none;color:#555;font-size:1.1rem;
-  cursor:pointer;padding:4px;
+.night-toggle{
+  background:none;border:none;color:var(--text3);
+  font-size:1.2rem;cursor:pointer;padding:4px;
+  transition:color .2s;
 }
+.night-toggle:active{color:var(--amber)}
+.fw-ver{
+  font-family:var(--mono);font-size:.55rem;font-weight:500;
+  color:var(--text3);letter-spacing:.06em;opacity:.5;
+}
+
+/* ═══ Entrance animations ══════════════════════════════════ */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.header{animation:fadeUp .5s ease both}
+.burst-wrap{animation:fadeUp .5s ease .05s both}
+.section:nth-child(3){animation:fadeUp .4s ease .1s both}
+.section:nth-child(4){animation:fadeUp .4s ease .15s both}
+.section:nth-child(5){animation:fadeUp .4s ease .2s both}
+.section:nth-child(6){animation:fadeUp .4s ease .25s both}
+.footer{animation:fadeUp .4s ease .3s both}
 </style>
 </head>
 <body>
 
-<!-- Header -->
 <div class="header">
-  <h1>FOG CONTROL</h1>
+  <h1>Fog Control</h1>
   <div class="badge">
     <span class="dot"></span>
     <span id="wifiMode">--</span>
     <span>&middot;</span>
-    <span><span id="clients">0</span> connected</span>
+    <span><span id="clients">0</span></span>
   </div>
 </div>
 
-<!-- Burst -->
-<button id="burst" onclick="fireBurst()">BURST</button>
+<div class="burst-wrap">
+  <div class="burst-ring" id="burstRing">
+    <button id="burst" onclick="fireBurst()">Burst</button>
+  </div>
+</div>
 
-<!-- Duration -->
 <div class="section">
-  <div class="sec-title">BURST DURATION</div>
+  <div class="sec-head">
+    <span class="sec-title">Duration</span>
+    <span class="val" id="durVal">2.0s</span>
+  </div>
   <div class="row">
     <input type="range" id="dur" min="0.1" max="10" step="0.1" value="2.0"
            oninput="send({cmd:'dur',val:parseFloat(this.value)});
                     document.getElementById('durVal').textContent=parseFloat(this.value).toFixed(1)+'s'">
-    <span class="val" id="durVal">2.0s</span>
   </div>
 </div>
 
-<!-- Hold -->
 <div class="section">
-  <div class="sec-title">HOLD</div>
+  <div class="sec-head">
+    <span class="sec-title">Hold</span>
+    <span class="lbl" id="holdLbl" style="min-width:0">OFF</span>
+  </div>
   <div class="row">
     <label class="switch">
       <input type="checkbox" id="holdCb" onchange="send({cmd:'hold',val:this.checked?1:0})">
       <span class="sl"></span>
     </label>
-    <span class="lbl" id="holdLbl">OFF</span>
     <span style="flex:1"></span>
-    <span class="lbl">MAX</span>
-    <input type="range" id="mh" min="10" max="120" step="5" value="30" style="width:80px;flex:none"
+    <span class="lbl" style="text-align:right;min-width:0">MAX</span>
+    <input type="range" id="mh" min="10" max="120" step="5" value="30" style="width:72px;flex:none"
            oninput="send({cmd:'mh',val:parseFloat(this.value)});
                     document.getElementById('mhVal').textContent=this.value+'s'">
     <span class="val" id="mhVal" style="min-width:2.5em">30s</span>
@@ -573,15 +674,16 @@ input[type=range]::-webkit-slider-thumb{
   </div>
 </div>
 
-<!-- Loop -->
 <div class="section">
-  <div class="sec-title">LOOP</div>
+  <div class="sec-head">
+    <span class="sec-title">Loop</span>
+    <span class="lbl" id="loopLbl" style="min-width:0">OFF</span>
+  </div>
   <div class="row">
     <label class="switch">
       <input type="checkbox" id="loopCb" onchange="send({cmd:'loop',val:this.checked?1:0})">
       <span class="sl"></span>
     </label>
-    <span class="lbl" id="loopLbl">OFF</span>
     <span style="flex:1"></span>
     <button class="tap-btn" onclick="handleTap()">TAP</button>
   </div>
@@ -594,45 +696,43 @@ input[type=range]::-webkit-slider-thumb{
   </div>
 </div>
 
-<!-- Pattern -->
 <div class="section">
-  <div class="sec-title">PATTERN</div>
-  <div class="row">
-    <button class="pat-btn rec-btn" id="recBtn" onclick="send({cmd:'rec'})">&#9679; REC</button>
-    <button class="pat-btn stop-btn" id="stopBtn" onclick="send({cmd:'stop'})">&#9632; STOP</button>
-    <button class="pat-btn play-btn" id="playBtn" onclick="send({cmd:'play'})">&#9654; PLAY</button>
+  <div class="sec-head">
+    <span class="sec-title">Pattern</span>
+    <span class="pat-info" id="patInfo"></span>
   </div>
-  <div class="save-row">
-    <span class="save-lbl">SAVE</span>
+  <div class="pat-row">
+    <button class="pat-btn rec-btn" id="recBtn" onclick="send({cmd:'rec'})">&#9679; Rec</button>
+    <button class="pat-btn stop-btn" id="stopBtn" onclick="send({cmd:'stop'})">&#9632; Stop</button>
+    <button class="pat-btn play-btn" id="playBtn" onclick="send({cmd:'play'})">&#9654; Play</button>
+  </div>
+  <div class="preset-row">
+    <span class="preset-lbl">SAVE</span>
     <button class="preset-btn" id="saveA" onclick="send({cmd:'save',val:0})">A</button>
     <button class="preset-btn" id="saveB" onclick="send({cmd:'save',val:1})">B</button>
     <button class="preset-btn" id="saveC" onclick="send({cmd:'save',val:2})">C</button>
   </div>
-  <div class="save-row">
-    <span class="save-lbl">LOAD</span>
+  <div class="preset-row">
+    <span class="preset-lbl">LOAD</span>
     <button class="preset-btn" id="loadA" onclick="send({cmd:'load',val:0})">A</button>
     <button class="preset-btn" id="loadB" onclick="send({cmd:'load',val:1})">B</button>
     <button class="preset-btn" id="loadC" onclick="send({cmd:'load',val:2})">C</button>
   </div>
-  <div class="pat-info" id="patInfo"></div>
 </div>
 
-<!-- Cooldown overlay -->
 <div class="cd-overlay" id="cdOverlay">
-  <div class="cd-label">COOLDOWN</div>
+  <div class="cd-label">Cooldown</div>
   <div class="cd-time" id="cdTime">0.0</div>
 </div>
 
-<!-- Footer -->
 <div class="footer">
-  <button class="night-btn" id="nightBtn" onclick="send({cmd:'night',val:document.body.classList.contains('night')?0:1})">&#9789;</button>
-  <span id="fwVer">v--</span>
+  <button class="night-toggle" id="nightBtn" onclick="send({cmd:'night',val:document.body.classList.contains('night')?0:1})">&#9789;</button>
+  <span class="fw-ver" id="fwVer">v--</span>
 </div>
 
 <script>
 var ws,state={},reconnTimer=null;
 
-// ── WebSocket ──────────────────────────────────────────────
 function connect(){
   ws=new WebSocket("ws://"+location.hostname+"/ws");
   ws.onopen=function(){clearTimeout(reconnTimer)};
@@ -647,14 +747,12 @@ function send(obj){
 }
 connect();
 
-// ── Burst ──────────────────────────────────────────────────
 function fireBurst(){
   var btn=document.getElementById("burst");
   if(btn.disabled)return;
   send({cmd:"burst"});
 }
 
-// ── Tap-tempo ──────────────────────────────────────────────
 var tapTimes=[],tapReset=null;
 function handleTap(){
   var now=Date.now();
@@ -674,7 +772,6 @@ function handleTap(){
   }
 }
 
-// ── Local countdown tick ───────────────────────────────────
 setInterval(function(){
   if(state.hold&&state.holdLeft>0){
     state.holdLeft=Math.max(0,state.holdLeft-0.1);
@@ -705,35 +802,31 @@ function renderCountdowns(){
   }
 }
 
-// ── Render UI from state ───────────────────────────────────
 function renderUI(){
   var btn=document.getElementById("burst");
-  if(state.burst||state.hold||state.relay){
-    btn.classList.add("firing");
-  }else{
-    btn.classList.remove("firing");
-  }
+  var ring=document.getElementById("burstRing");
+  var isFiring=state.burst||state.hold||state.relay;
+
+  if(isFiring){btn.classList.add("firing")}else{btn.classList.remove("firing")}
+  if(isFiring||state.play){ring.classList.add("active")}else{ring.classList.remove("active")}
+  if(state.rec){ring.classList.add("rec-active")}else{ring.classList.remove("rec-active")}
   btn.disabled=state.hold||state.cd||state.play;
 
-  // Duration
   document.getElementById("dur").value=state.dur;
   document.getElementById("durVal").textContent=state.dur.toFixed(1)+"s";
 
-  // Hold
   document.getElementById("holdCb").checked=state.hold;
   document.getElementById("holdLbl").textContent=state.hold?"ON":"OFF";
   document.getElementById("mh").value=state.mh;
   document.getElementById("mhVal").textContent=state.mh+"s";
   document.getElementById("holdCb").disabled=state.cd||state.rec||state.play;
 
-  // Loop
   document.getElementById("loopCb").checked=state.loop;
   document.getElementById("loopLbl").textContent=state.loop?"ON":"OFF";
   document.getElementById("li").value=state.li;
   document.getElementById("liVal").textContent=state.li.toFixed(1)+"s";
   document.getElementById("loopCb").disabled=state.cd||state.rec||state.play;
 
-  // Pattern buttons
   var recBtn=document.getElementById("recBtn");
   var stopBtn=document.getElementById("stopBtn");
   var playBtn=document.getElementById("playBtn");
@@ -746,50 +839,43 @@ function renderUI(){
 
   stopBtn.disabled=!state.rec&&!state.play&&!state.burst&&!state.loop;
 
-  // Save buttons — disabled if no pattern
   var hasPat=state.patLen>0;
   document.getElementById("saveA").disabled=!hasPat||state.rec;
   document.getElementById("saveB").disabled=!hasPat||state.rec;
   document.getElementById("saveC").disabled=!hasPat||state.rec;
 
-  // Load buttons — disabled if slot empty
   var loadBtns=["loadA","loadB","loadC"];
+  var saveBtns=["saveA","saveB","saveC"];
   for(var i=0;i<3;i++){
     var lb=document.getElementById(loadBtns[i]);
     lb.disabled=!state.slots[i]||state.rec;
     if(state.slots[i]){lb.classList.add("has-data")}else{lb.classList.remove("has-data")}
     if(state.slot==i){lb.classList.add("active")}else{lb.classList.remove("active")}
-  }
-  // Also highlight save buttons for active slot
-  var saveBtns=["saveA","saveB","saveC"];
-  for(var i=0;i<3;i++){
     var sb=document.getElementById(saveBtns[i]);
     if(state.slots[i]){sb.classList.add("has-data")}else{sb.classList.remove("has-data")}
     if(state.slot==i){sb.classList.add("active")}else{sb.classList.remove("active")}
   }
 
-  // Pattern info
   var info=document.getElementById("patInfo");
   if(state.rec){
-    info.textContent="Recording... "+state.patLen+" taps";
+    info.textContent=state.patLen+" taps";
+    info.classList.add("recording");
   }else if(state.patLen>0){
     var secs=(state.patDur/1000).toFixed(1);
     info.textContent=state.patLen+" tap"+(state.patLen!=1?"s":"")+" \u00b7 "+secs+"s";
+    info.classList.remove("recording");
   }else{
     info.textContent="";
+    info.classList.remove("recording");
   }
 
-  // Connection
   document.getElementById("wifiMode").textContent=state.ap?"AP":"HOME";
   document.getElementById("clients").textContent=state.clients;
 
-  // Night mode
   if(state.night){document.body.classList.add("night")}
   else{document.body.classList.remove("night")}
 
-  // Version
   document.getElementById("fwVer").textContent="v"+state.ver;
-
   renderCountdowns();
 }
 </script>
