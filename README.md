@@ -138,6 +138,38 @@ pio run -t upload --upload-port fog.local
 - **STA Mode**: Saved networks shown with forget (X) buttons — manage from the UI
 - Saves up to 8 networks in flash (NVS). On boot, connects to the strongest known network in range
 
+## REST API
+
+Every endpoint returns the full state JSON and works with CORS. Trigger fog from anything — curl, Shortcuts, Home Assistant, Stream Deck, whatever.
+
+```bash
+# Fire a burst
+curl http://fog.local/api/burst
+
+# Start looping every 3 seconds
+curl "http://fog.local/api/loop?val=1"
+curl "http://fog.local/api/li?val=3.0"
+
+# Stop everything
+curl http://fog.local/api/stop
+
+# Check current state
+curl http://fog.local/api/status
+```
+
+| Endpoint | Action |
+|----------|--------|
+| `GET /api/status` | Current state (no action) |
+| `GET /api/burst` | Fire a single burst |
+| `GET /api/stop` | Stop everything |
+| `GET /api/hold?val=1\|0` | Hold on/off (default: on) |
+| `GET /api/loop?val=1\|0` | Loop on/off (default: on) |
+| `GET /api/play` | Play current pattern |
+| `GET /api/dur?val=X` | Set burst duration (0.1–10s) |
+| `GET /api/li?val=X` | Set loop interval (0.15–60s) |
+| `GET /api/night?val=1\|0` | Night mode on/off |
+| `GET /api/help` | List all endpoints |
+
 ## Configuration
 
 Key defaults in `src/main.cpp`:
@@ -147,7 +179,7 @@ Key defaults in `src/main.cpp`:
 | Burst duration | 2.0s | 0.1–10s |
 | Loop interval | 5.0s | 0.15–60s |
 | Max hold time | 30s | 10–120s |
-| Cooldown | 10s | Fixed |
+| Cooldown | 10s | 1–60s (or disabled via Settings) |
 | AP SSID | "FogControl" | Change `AP_SSID` |
 
 ## License

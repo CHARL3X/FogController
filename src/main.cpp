@@ -1136,6 +1136,20 @@ void handleNotFound(AsyncWebServerRequest *request) {
   else request->send(404, "text/plain", "not found");
 }
 
+// ── REST API helpers ───────────────────────────────────────────────────────
+void apiExec(AsyncWebServerRequest *request, const String& json) {
+  lastClientActivityMs = millis();
+  handleWsCommand((uint8_t*)json.c_str(), json.length());
+  AsyncWebServerResponse *r = request->beginResponse(200, "application/json", buildStateJson());
+  r->addHeader("Access-Control-Allow-Origin", "*");
+  request->send(r);
+}
+void apiStatus(AsyncWebServerRequest *request) {
+  AsyncWebServerResponse *r = request->beginResponse(200, "application/json", buildStateJson());
+  r->addHeader("Access-Control-Allow-Origin", "*");
+  request->send(r);
+}
+
 // ── OTA setup helper ────────────────────────────────────────────────────────
 void setupOTA() {
   ArduinoOTA.setHostname("fog");
@@ -1223,6 +1237,48 @@ void setup() {
   ws.onEvent(onWsEvent);
   webServer.addHandler(&ws);
   webServer.on("/", HTTP_GET, servePage);
+
+  // ── REST API ──────────────────────────────────────────────────────────
+  webServer.on("/api/help", HTTP_GET, [](AsyncWebServerRequest *r) {
+    AsyncWebServerResponse *res = r->beginResponse(200, "application/json",
+      "{\"endpoints\":[\"/api/status\",\"/api/burst\",\"/api/stop\","
+      "\"/api/hold?val=0|1\",\"/api/loop?val=0|1\",\"/api/play\","
+      "\"/api/dur?val=0.1-10\",\"/api/li?val=0.15-60\",\"/api/night?val=0|1\"]}");
+    res->addHeader("Access-Control-Allow-Origin", "*");
+    r->send(res);
+  });
+  webServer.on("/api/status", HTTP_GET, apiStatus);
+  webServer.on("/api/burst", HTTP_GET, [](AsyncWebServerRequest *r) {
+    apiExec(r, "{\"cmd\":\"burst\"}");
+  });
+  webServer.on("/api/stop", HTTP_GET, [](AsyncWebServerRequest *r) {
+    apiExec(r, "{\"cmd\":\"stop\"}");
+  });
+  webServer.on("/api/hold", HTTP_GET, [](AsyncWebServerRequest *r) {
+    String v = r->hasParam("val") ? r->getParam("val")->value() : "1";
+    apiExec(r, "{\"cmd\":\"hold\",\"val\":" + v + "}");
+  });
+  webServer.on("/api/loop", HTTP_GET, [](AsyncWebServerRequest *r) {
+    String v = r->hasParam("val") ? r->getParam("val")->value() : "1";
+    apiExec(r, "{\"cmd\":\"loop\",\"val\":" + v + "}");
+  });
+  webServer.on("/api/play", HTTP_GET, [](AsyncWebServerRequest *r) {
+    apiExec(r, "{\"cmd\":\"play\"}");
+  });
+  webServer.on("/api/dur", HTTP_GET, [](AsyncWebServerRequest *r) {
+    if (r->hasParam("val")) {
+      apiExec(r, "{\"cmd\":\"dur\",\"val\":" + r->getParam("val")->value() + "}");
+    } else { apiStatus(r); }
+  });
+  webServer.on("/api/li", HTTP_GET, [](AsyncWebServerRequest *r) {
+    if (r->hasParam("val")) {
+      apiExec(r, "{\"cmd\":\"li\",\"val\":" + r->getParam("val")->value() + "}");
+    } else { apiStatus(r); }
+  });
+  webServer.on("/api/night", HTTP_GET, [](AsyncWebServerRequest *r) {
+    String v = r->hasParam("val") ? r->getParam("val")->value() : "1";
+    apiExec(r, "{\"cmd\":\"night\",\"val\":" + v + "}");
+  });
 
   if (apMode) {
     webServer.on("/generate_204",        HTTP_GET, servePage);
