@@ -383,7 +383,7 @@ void handleWsCommand(uint8_t *data, size_t len) {
     }
   }
   else if (cmd == "li") {
-    if (val >= 0.5 && val <= 60.0) loopInterval = val;
+    if (val >= 0.15 && val <= 60.0) loopInterval = val;
   }
   else if (cmd == "mh") {
     if (val >= 10 && val <= 120) maxHoldTime = val;
@@ -776,7 +776,7 @@ input[type=range]:active::-webkit-slider-thumb{background:var(--amber)}
   </div>
   <div class="row">
     <span class="lbl">Every</span>
-    <input type="range" id="li" min="0.5" max="60" step="0.5" value="5.0"
+    <input type="range" id="li" min="0.15" max="60" step="0.05" value="5.0"
            oninput="send({cmd:'li',val:parseFloat(this.value)});document.getElementById('liVal').textContent=parseFloat(this.value).toFixed(1)+'s'">
     <span class="val" id="liVal">5.0s</span>
   </div>
@@ -846,7 +846,7 @@ function handleTap(){
   tapTimes.push(now);if(tapTimes.length>8)tapTimes.shift();
   if(tapTimes.length>=2){var s=0;for(var i=1;i<tapTimes.length;i++)s+=tapTimes[i]-tapTimes[i-1];
     var a=s/(tapTimes.length-1),sec=Math.round(a/100)/10;
-    sec=Math.max(0.5,Math.min(60,sec));
+    sec=Math.max(0.15,Math.min(60,sec));
     document.getElementById("li").value=sec;
     document.getElementById("liVal").textContent=sec.toFixed(1)+"s";
     send({cmd:"li",val:sec})}
@@ -1230,7 +1230,9 @@ void loop() {
   // ── Burst timeout ─────────────────────────────────────────────────────
   if (burstActive && !holdActive && !playing) {
     if (now - burstStartMs >= (unsigned long)(burstDuration * 1000.0)) {
-      relayOff(); burstActive = false; broadcastState();
+      relayOff(); burstActive = false;
+      if (loopActive) loopLastFireMs = now; // gap timer starts after burst ends
+      broadcastState();
     }
   }
 
@@ -1249,10 +1251,10 @@ void loop() {
     }
   }
 
-  // ── Loop/repeat mode ──────────────────────────────────────────────────
+  // ── Loop/repeat mode (gap-based: interval is silence between bursts) ──
   if (loopActive && !holdActive && !cooldownActive && !burstActive && !playing) {
     if (now - loopLastFireMs >= (unsigned long)(loopInterval * 1000.0)) {
-      burstActive = true; burstStartMs = now; loopLastFireMs = now;
+      burstActive = true; burstStartMs = now;
       relayOn(); broadcastState();
     }
   }
