@@ -1,5 +1,5 @@
 /*
- * Fog Machine Remote V3.1 — ESP32 WiFi Controller
+ * Fog Machine Remote V3.2 — ESP32 WiFi Controller
  *
  * NodeMCU ESP32S drives a relay on GPIO 4 (active-high)
  * to trigger a fog machine's momentary port.
@@ -20,7 +20,7 @@
 #include <ESPAsyncWebServer.h>
 #include <Preferences.h>
 
-#define FW_VERSION "3.1.0"
+#define FW_VERSION "3.2.0"
 
 // ── Hardware ────────────────────────────────────────────────────────────────
 const int RELAY_PIN = 4;
@@ -121,7 +121,9 @@ float         maxHoldTime    = 30.0;
 // ── State: Cooldown ─────────────────────────────────────────────────────────
 bool          cooldownActive  = false;
 unsigned long cooldownStartMs = 0;
-const float   COOLDOWN_TIME   = 10.0;
+float         cooldownTime    = 10.0;
+bool          cooldownEnabled = true;
+bool          maxHoldEnabled  = true;
 
 // ── State: Loop/repeat ──────────────────────────────────────────────────────
 bool          loopActive     = false;
@@ -158,8 +160,21 @@ bool nightMode = false;
 
 // ── State: Disconnect safety ────────────────────────────────────────────────
 unsigned long lastClientActivityMs = 0;
-const unsigned long DISCONNECT_TIMEOUT_MS = 15000;
+unsigned long disconnectTimeout = 15;
+bool          disconnectSafetyEnabled = true;
 unsigned long lastBroadcastMs = 0;
+
+// ── Settings (NVS persistence) ──────────────────────────────────────────────
+void loadSettings() {
+  prefs.begin("cfg", true);
+  maxHoldEnabled = prefs.getBool("mhen", true);
+  maxHoldTime = prefs.getFloat("mh", 30.0);
+  cooldownEnabled = prefs.getBool("cden", true);
+  cooldownTime = prefs.getFloat("cdt", 10.0);
+  disconnectSafetyEnabled = prefs.getBool("dsen", true);
+  disconnectTimeout = prefs.getULong("dst", 15);
+  prefs.end();
+}
 
 // ── Relay / LED helpers ─────────────────────────────────────────────────────
 void relayOn()  { digitalWrite(RELAY_PIN, RELAY_ON);  }
@@ -192,7 +207,7 @@ String extractJsonStr(const String& json, const char* key) {
 // ── State JSON builder ──────────────────────────────────────────────────────
 String buildStateJson() {
   float holdLeft = 0;
-  if (holdActive) {
+  if (holdActive && maxHoldEnabled) {
     float elapsed = (millis() - holdStartMs) / 1000.0;
     holdLeft = maxHoldTime - elapsed;
     if (holdLeft < 0) holdLeft = 0;
@@ -200,7 +215,7 @@ String buildStateJson() {
   float cdLeft = 0;
   if (cooldownActive) {
     float elapsed = (millis() - cooldownStartMs) / 1000.0;
-    cdLeft = COOLDOWN_TIME - elapsed;
+    cdLeft = cooldownTime - elapsed;
     if (cdLeft < 0) cdLeft = 0;
   }
 
@@ -211,7 +226,8 @@ String buildStateJson() {
     "\"holdLeft\":%.1f,\"cd\":%d,\"cdLeft\":%.1f,"
     "\"rec\":%d,\"play\":%d,\"patLen\":%d,\"patDur\":%lu,\"slot\":%d,"
     "\"slots\":[%d,%d,%d],"
-    "\"clients\":%u,\"night\":%d,\"ap\":%d,\"ver\":\"%s\"}",
+    "\"clients\":%u,\"night\":%d,\"ap\":%d,\"ver\":\"%s\","
+    "\"cdt\":%.1f,\"cden\":%d,\"mhen\":%d,\"dsen\":%d,\"dst\":%lu}",
     digitalRead(RELAY_PIN) == RELAY_ON ? 1 : 0,
     burstActive ? 1 : 0,
     holdActive ? 1 : 0,
@@ -233,7 +249,12 @@ String buildStateJson() {
     (unsigned int)ws.count(),
     nightMode ? 1 : 0,
     apMode ? 1 : 0,
-    FW_VERSION
+    FW_VERSION,
+    cooldownTime,
+    cooldownEnabled ? 1 : 0,
+    maxHoldEnabled ? 1 : 0,
+    disconnectSafetyEnabled ? 1 : 0,
+    disconnectTimeout
   );
   return String(buf);
 }
@@ -382,7 +403,34 @@ void handleWsCommand(uint8_t *data, size_t len) {
     if (val >= 0.15 && val <= 60.0) loopInterval = val;
   }
   else if (cmd == "mh") {
-    if (val >= 10 && val <= 120) maxHoldTime = val;
+    if (val >= 10 && val <= 120) {
+      maxHoldTime = val;
+      prefs.begin("cfg", false); prefs.putFloat("mh", val); prefs.end();
+    }
+  }
+  else if (cmd == "mhen") {
+    maxHoldEnabled = (val > 0);
+    prefs.begin("cfg", false); prefs.putBool("mhen", maxHoldEnabled); prefs.end();
+  }
+  else if (cmd == "cden") {
+    cooldownEnabled = (val > 0);
+    prefs.begin("cfg", false); prefs.putBool("cden", cooldownEnabled); prefs.end();
+  }
+  else if (cmd == "cdt") {
+    if (val >= 1 && val <= 60) {
+      cooldownTime = val;
+      prefs.begin("cfg", false); prefs.putFloat("cdt", val); prefs.end();
+    }
+  }
+  else if (cmd == "dsen") {
+    disconnectSafetyEnabled = (val > 0);
+    prefs.begin("cfg", false); prefs.putBool("dsen", disconnectSafetyEnabled); prefs.end();
+  }
+  else if (cmd == "dst") {
+    if (val >= 5 && val <= 120) {
+      disconnectTimeout = (unsigned long)val;
+      prefs.begin("cfg", false); prefs.putULong("dst", disconnectTimeout); prefs.end();
+    }
   }
   else if (cmd == "night") {
     nightMode = (val > 0);
@@ -707,6 +755,10 @@ input[type=range]:active::-webkit-slider-thumb{background:var(--amber)}
 .night-toggle:active{color:var(--amber)}
 .fw-ver{font-family:var(--mono);font-size:.55rem;font-weight:500;color:var(--text3);letter-spacing:.06em;opacity:.5}
 
+.settings-group{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.settings-group:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+.settings-group .row.dim{opacity:.3;pointer-events:none}
+.settings-desc{font-family:var(--mono);font-size:.55rem;color:var(--text3);line-height:1.4;margin-top:4px;letter-spacing:.01em}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .header{animation:fadeUp .5s ease both}
 .burst-wrap{animation:fadeUp .5s ease .05s both}
@@ -754,11 +806,6 @@ input[type=range]:active::-webkit-slider-thumb{background:var(--amber)}
   <div class="sec-head"><span class="sec-title">Hold</span><span class="lbl" id="holdLbl" style="min-width:0">OFF</span></div>
   <div class="row">
     <label class="switch"><input type="checkbox" id="holdCb" onchange="send({cmd:'hold',val:this.checked?1:0})"><span class="sl"></span></label>
-    <span style="flex:1"></span>
-    <span class="lbl" style="text-align:right;min-width:0">MAX</span>
-    <input type="range" id="mh" min="10" max="120" step="5" value="30" style="width:72px;flex:none"
-           oninput="send({cmd:'mh',val:parseFloat(this.value)});document.getElementById('mhVal').textContent=this.value+'s'">
-    <span class="val" id="mhVal" style="min-width:2.5em">30s</span>
   </div>
   <div class="hold-bar-wrap" id="holdBarWrap"><div class="hold-bar" id="holdBar"></div></div>
 </div>
@@ -810,8 +857,40 @@ input[type=range]:active::-webkit-slider-thumb{background:var(--amber)}
   <div class="cd-time" id="cdTime">0.0</div>
 </div>
 
+<div class="section" id="settingsSection" style="display:none">
+  <div class="sec-head"><span class="sec-title">Settings</span></div>
+  <div class="settings-group">
+    <div class="row"><span class="lbl" style="flex:1;min-width:0">Max hold timer</span>
+      <label class="switch"><input type="checkbox" id="mhenCb" onchange="send({cmd:'mhen',val:this.checked?1:0})"><span class="sl"></span></label></div>
+    <div class="settings-desc">Auto-cuts fog after holding this long. Off = unlimited hold.</div>
+    <div class="row" id="mhRow" style="margin-top:6px">
+      <input type="range" id="mh" min="10" max="120" step="5" value="30"
+             oninput="send({cmd:'mh',val:parseFloat(this.value)});document.getElementById('mhVal').textContent=this.value+'s'">
+      <span class="val" id="mhVal">30s</span></div>
+  </div>
+  <div class="settings-group">
+    <div class="row"><span class="lbl" style="flex:1;min-width:0">Cooldown after hold</span>
+      <label class="switch"><input type="checkbox" id="cdenCb" onchange="send({cmd:'cden',val:this.checked?1:0})"><span class="sl"></span></label></div>
+    <div class="settings-desc">Forced pause after max hold cuts off. Off = no wait.</div>
+    <div class="row" id="cdtRow" style="margin-top:6px">
+      <input type="range" id="cdt" min="1" max="60" step="1" value="10"
+             oninput="send({cmd:'cdt',val:parseFloat(this.value)});document.getElementById('cdtVal').textContent=this.value+'s'">
+      <span class="val" id="cdtVal">10s</span></div>
+  </div>
+  <div class="settings-group">
+    <div class="row"><span class="lbl" style="flex:1;min-width:0">Disconnect safety</span>
+      <label class="switch"><input type="checkbox" id="dsenCb" onchange="send({cmd:'dsen',val:this.checked?1:0})"><span class="sl"></span></label></div>
+    <div class="settings-desc">Stops fog if all devices disconnect. Off = fog keeps running.</div>
+    <div class="row" id="dstRow" style="margin-top:6px">
+      <input type="range" id="dst" min="5" max="120" step="5" value="15"
+             oninput="send({cmd:'dst',val:parseFloat(this.value)});document.getElementById('dstVal').textContent=this.value+'s'">
+      <span class="val" id="dstVal">15s</span></div>
+  </div>
+</div>
+
 <div class="footer">
   <button class="night-toggle" id="nightBtn" onclick="send({cmd:'night',val:document.body.classList.contains('night')?0:1})">&#9789;</button>
+  <button class="night-toggle" id="gearBtn" onclick="toggleSettings()">&#9881;</button>
   <span class="fw-ver" id="fwVer">v--</span>
 </div>
 
@@ -849,13 +928,13 @@ function handleTap(){
 }
 
 setInterval(function(){
-  if(state.hold&&state.holdLeft>0){state.holdLeft=Math.max(0,state.holdLeft-0.1);renderCountdowns()}
+  if(state.hold&&state.mhen&&state.holdLeft>0){state.holdLeft=Math.max(0,state.holdLeft-0.1);renderCountdowns()}
   if(state.cd&&state.cdLeft>0){state.cdLeft=Math.max(0,state.cdLeft-0.1);renderCountdowns()}
 },100);
 
 function renderCountdowns(){
   var w=document.getElementById("holdBarWrap"),b=document.getElementById("holdBar");
-  if(state.hold&&state.mh>0){w.classList.add("active");b.style.width=Math.max(0,(state.holdLeft/state.mh)*100)+"%"}else{w.classList.remove("active")}
+  if(state.hold&&state.mhen&&state.mh>0){w.classList.add("active");b.style.width=Math.max(0,(state.holdLeft/state.mh)*100)+"%"}else{w.classList.remove("active")}
   var c=document.getElementById("cdOverlay"),t=document.getElementById("cdTime");
   if(state.cd){c.classList.add("active");t.textContent=state.cdLeft.toFixed(1)}else{c.classList.remove("active")}
 }
@@ -961,6 +1040,33 @@ function forgetNet(idx){send({cmd:"wforget",val:idx})}
 
 function escHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 
+function toggleSettings(){
+  var s=document.getElementById("settingsSection");
+  s.style.display=s.style.display==="none"?"block":"none";
+}
+function renderSettings(){
+  if(!state.mh)return;
+  document.getElementById("mhenCb").checked=!!state.mhen;
+  document.getElementById("mh").value=state.mh;
+  document.getElementById("mhVal").textContent=state.mh+"s";
+  var mhR=document.getElementById("mhRow");
+  if(state.mhen){mhR.classList.remove("dim")}else{mhR.classList.add("dim")}
+  document.getElementById("mh").disabled=!state.mhen;
+
+  document.getElementById("cdenCb").checked=!!state.cden;
+  document.getElementById("cdt").value=state.cdt;
+  document.getElementById("cdtVal").textContent=state.cdt+"s";
+  var cdR=document.getElementById("cdtRow");
+  if(state.cden){cdR.classList.remove("dim")}else{cdR.classList.add("dim")}
+  document.getElementById("cdt").disabled=!state.cden;
+
+  document.getElementById("dsenCb").checked=!!state.dsen;
+  document.getElementById("dst").value=state.dst;
+  document.getElementById("dstVal").textContent=state.dst+"s";
+  var dsR=document.getElementById("dstRow");
+  if(state.dsen){dsR.classList.remove("dim")}else{dsR.classList.add("dim")}
+  document.getElementById("dst").disabled=!state.dsen;
+}
 // ── Render UI ──────────────────────────────────────────────
 function renderUI(){
   var btn=document.getElementById("burst"),ring=document.getElementById("burstRing");
@@ -974,9 +1080,8 @@ function renderUI(){
   document.getElementById("durVal").textContent=state.dur.toFixed(1)+"s";
   document.getElementById("holdCb").checked=state.hold;
   document.getElementById("holdLbl").textContent=state.hold?"ON":"OFF";
-  document.getElementById("mh").value=state.mh;
-  document.getElementById("mhVal").textContent=state.mh+"s";
   document.getElementById("holdCb").disabled=state.cd||state.rec||state.play;
+  renderSettings();
   document.getElementById("loopCb").checked=state.loop;
   document.getElementById("loopLbl").textContent=state.loop?"ON":"OFF";
   document.getElementById("li").value=state.li;
@@ -1050,10 +1155,11 @@ void setup() {
   ledOff();
 
   Serial.begin(115200);
-  Serial.println("\n[FogControl V3.1] Starting...");
+  Serial.println("\n[FogControl V3.2] Starting...");
 
-  // Load saved WiFi networks from NVS
+  // Load saved WiFi networks and settings from NVS
   loadSavedNetworks();
+  loadSettings();
 
   // Scan for known networks
   Serial.print("[FogControl] Scanning...");
@@ -1131,7 +1237,7 @@ void setup() {
   webServer.onNotFound(handleNotFound);
   webServer.begin();
   lastClientActivityMs = millis();
-  Serial.println("[FogControl V3.1] Ready.");
+  Serial.println("[FogControl V3.2] Ready.");
 }
 
 // ── Loop ────────────────────────────────────────────────────────────────────
@@ -1224,16 +1330,17 @@ void loop() {
   }
 
   // ── Max hold timer ────────────────────────────────────────────────────
-  if (holdActive) {
+  if (holdActive && maxHoldEnabled) {
     if (now - holdStartMs >= (unsigned long)(maxHoldTime * 1000.0)) {
       holdActive = false; burstActive = false; relayOff();
-      cooldownActive = true; cooldownStartMs = now; broadcastState();
+      if (cooldownEnabled) { cooldownActive = true; cooldownStartMs = now; }
+      broadcastState();
     }
   }
 
   // ── Cooldown ──────────────────────────────────────────────────────────
   if (cooldownActive) {
-    if (now - cooldownStartMs >= (unsigned long)(COOLDOWN_TIME * 1000.0)) {
+    if (now - cooldownStartMs >= (unsigned long)(cooldownTime * 1000.0)) {
       cooldownActive = false; broadcastState();
     }
   }
@@ -1261,8 +1368,8 @@ void loop() {
   if (playing && cooldownActive && playRelayOn) { relayOff(); playRelayOn = false; }
 
   // ── Disconnect safety ─────────────────────────────────────────────────
-  if (ws.count() == 0 && (holdActive || burstActive || loopActive || playing)) {
-    if (now - lastClientActivityMs >= DISCONNECT_TIMEOUT_MS) {
+  if (disconnectSafetyEnabled && ws.count() == 0 && (holdActive || burstActive || loopActive || playing)) {
+    if (now - lastClientActivityMs >= disconnectTimeout * 1000) {
       holdActive = false; burstActive = false; loopActive = false;
       playing = false; recording = false; cooldownActive = false;
       playRelayOn = false; relayOff();
