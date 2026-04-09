@@ -29,10 +29,6 @@ const int RELAY_OFF = LOW;
 const int LED_PIN   = 2;
 
 // ── Network ─────────────────────────────────────────────────────────────────
-// Seed credentials — saved to NVS on first boot, then NVS is authoritative
-const char* SEED_SSID = "Intergalactic Networking Hub";
-const char* SEED_PASS = "charlestobin";
-
 const char* AP_SSID = "FogControl";
 const IPAddress AP_IP(192, 168, 4, 1);
 const IPAddress AP_GATEWAY(192, 168, 4, 1);
@@ -1058,15 +1054,6 @@ void setup() {
 
   // Load saved WiFi networks from NVS
   loadSavedNetworks();
-
-  // Seed migration: first boot with empty NVS → save hardcoded creds
-  if (savedCount == 0) {
-    savedNets[0].ssid = SEED_SSID;
-    savedNets[0].pass = SEED_PASS;
-    savedCount = 1;
-    saveAllNetworks();
-    Serial.println("[FogControl] Seeded NVS with default credentials.");
-  }
 
   // Scan for known networks
   Serial.print("[FogControl] Scanning...");
