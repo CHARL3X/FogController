@@ -176,6 +176,39 @@ void loadSettings() {
   prefs.end();
 }
 
+// ── Pattern preset persistence (NVS) ────────────────────────────────────────
+void savePreset(int slot) {
+  if (slot < 0 || slot >= NUM_PRESETS) return;
+  char kC[4], kT[4], kE[4];
+  snprintf(kC, sizeof(kC), "p%dc", slot);
+  snprintf(kT, sizeof(kT), "p%dt", slot);
+  snprintf(kE, sizeof(kE), "p%de", slot);
+  prefs.begin("pat", false);
+  prefs.putInt(kC, presets[slot].count);
+  prefs.putULong(kT, presets[slot].totalLengthMs);
+  if (presets[slot].count > 0)
+    prefs.putBytes(kE, presets[slot].events, presets[slot].count * sizeof(PatternEvent));
+  else
+    prefs.remove(kE);
+  prefs.end();
+}
+
+void loadPresets() {
+  prefs.begin("pat", true);
+  for (int s = 0; s < NUM_PRESETS; s++) {
+    char kC[4], kT[4], kE[4];
+    snprintf(kC, sizeof(kC), "p%dc", s);
+    snprintf(kT, sizeof(kT), "p%dt", s);
+    snprintf(kE, sizeof(kE), "p%de", s);
+    presets[s].count = prefs.getInt(kC, 0);
+    presets[s].totalLengthMs = prefs.getULong(kT, 0);
+    if (presets[s].count > 0 && presets[s].count <= MAX_EVENTS)
+      prefs.getBytes(kE, presets[s].events, presets[s].count * sizeof(PatternEvent));
+    else { presets[s].count = 0; presets[s].totalLengthMs = 0; }
+  }
+  prefs.end();
+}
+
 // ── Relay / LED helpers ─────────────────────────────────────────────────────
 void relayOn()  { digitalWrite(RELAY_PIN, RELAY_ON);  }
 void relayOff() { digitalWrite(RELAY_PIN, RELAY_OFF); }
@@ -461,6 +494,7 @@ void handleWsCommand(uint8_t *data, size_t len) {
     int slot = (int)val;
     if (slot >= 0 && slot < NUM_PRESETS && currentPattern.count > 0) {
       presets[slot] = currentPattern; activeSlot = slot;
+      savePreset(slot);
     }
   }
   else if (cmd == "load") {
@@ -1174,6 +1208,7 @@ void setup() {
   // Load saved WiFi networks and settings from NVS
   loadSavedNetworks();
   loadSettings();
+  loadPresets();
 
   // Scan for known networks
   Serial.print("[FogControl] Scanning...");
